@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import logo from "../../assets/images/logo.svg";
 import BurgerIcon from "../icons/burger";
 import { useTranslation } from "react-i18next";
@@ -10,6 +10,7 @@ export default function Navbar() {
   const { t, i18n } = useTranslation();
   const [isNavVisible, setIsNavVisible] = useState(true);
   const [isDropdownVisible, setIsDropdownVisible] = useState(false);
+  const dropdownRef = useRef(null);
 
   const toggleNavVisibility = () => {
     setIsNavVisible(!isNavVisible);
@@ -20,17 +21,22 @@ export default function Navbar() {
   };
 
   const changeLanguage = (lng) => {
-    console.log(`Changing language to ${lng}`);
     i18n.changeLanguage(lng);
     setIsDropdownVisible(false);
   };
 
   useEffect(() => {
-    const savedLang = localStorage.getItem("i18nextLng");
-    if (savedLang) {
-      i18n.changeLanguage(savedLang);
-    }
-  }, [i18n]);
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsDropdownVisible(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [dropdownRef]);
 
   return (
       <nav className="bg-white border-gray-200 sm:p-7 z-auto">
@@ -83,7 +89,7 @@ export default function Navbar() {
                   {t("navbar.contact")}
                 </a>
               </li>
-              <li className="relative">
+              <li className="relative" ref={dropdownRef}>
                 <button
                     onClick={toggleDropdownVisibility}
                     className="flex items-center py-2 px-3 text-sky-950 rounded hover:bg-gray-100 md:hover:bg-transparent md:border-0 md:hover:text-[#5FACD3] md:p-0"
@@ -92,17 +98,17 @@ export default function Navbar() {
                   {i18n.language === "fr" ? "Français" : "English"}
                 </button>
                 {isDropdownVisible && (
-                    <div className="absolute right-0 mt-2 w-32 md:w-40 bg-white border border-gray-200 rounded shadow-lg" onClick={(e) => e.stopPropagation()}>
+                    <div className="absolute right-0 mt-2 w-32 md:w-40 bg-white border border-gray-200 rounded shadow-lg">
                       <button
                           onClick={() => changeLanguage("fr")}
-                          className="flex cursor-pointer items-center w-full px-4 py-2 text-gray-700 hover:bg-gray-100 text-left"
+                          className="flex items-center w-full px-4 py-2 text-gray-700 hover:bg-gray-100 text-left"
                       >
                         <img src={flagFR} alt="French flag" className="h-5 w-5 mr-2" />
                         Français
                       </button>
                       <button
                           onClick={() => changeLanguage("en")}
-                          className="flex cursor-pointer items-center w-full px-4 py-2 text-gray-700 hover:bg-gray-100 text-left"
+                          className="flex items-center w-full px-4 py-2 text-gray-700 hover:bg-gray-100 text-left"
                       >
                         <img src={flagEN} alt="English flag" className="h-5 w-5 mr-2" />
                         English
@@ -113,7 +119,6 @@ export default function Navbar() {
             </ul>
           </div>
         </div>
-        {isDropdownVisible && <div className="fixed inset-0 z-10" onClick={() => setIsDropdownVisible(false)}></div>}
       </nav>
   );
 }

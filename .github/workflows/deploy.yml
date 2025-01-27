@@ -1,51 +1,52 @@
-name: Déployer l'application React et le serveur API
+name: CI/CD Pipeline
 
 on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Vérifier le code
+      - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Configurer Node.js
+      - name: Set up Node.js
         uses: actions/setup-node@v2
         with:
-          node-version: "16"
+          node-version: '18'
 
-      - name: Installer les dépendances
+      - name: Install dependencies
         run: npm install
 
-      - name: Construire l'application
+      - name: Build the project
         run: npm run build
 
-      - name: Ajouter le fichier .htaccess
-        run: |
-          echo '<IfModule mod_rewrite.c>
-            RewriteEngine On
-            RewriteBase /
-            RewriteRule ^index\.html$ - [L]
-            RewriteCond %{REQUEST_FILENAME} !-f
-            RewriteCond %{REQUEST_FILENAME} !-d
-            RewriteRule . /index.html [L]
-          </IfModule>' > build/.htaccess
+      - name: Build Docker image
+        run: docker build -t rom1dev/gui-portfolio .
 
-      - name: Déployer sur le VPS
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_KEY }}
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_HOST: ${{ secrets.VPS_IP }}
-        run: |
-          echo "$SSH_PRIVATE_KEY" > private_key
-          chmod 600 private_key
-          # Copier les fichiers de construction et le répertoire src/server
-          scp -o StrictHostKeyChecking=no -i private_key -r build/* $VPS_USER@$VPS_HOST:/var/www/portfolio/
-          scp -o StrictHostKeyChecking=no -i private_key -r src/server $VPS_USER@$VPS_HOST:/var/www/portfolio/
-          scp -o StrictHostKeyChecking=no -i private_key package.json $VPS_USER@$VPS_HOST:/var/www/portfolio/
-          # Exécuter npm install dans le répertoire de déploiement pour le serveur
-          ssh -o StrictHostKeyChecking=no -i private_key $VPS_USER@$VPS_HOST "cd /var/www/portfolio/server && npm install --production"
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Push Docker image
+        run: docker push rom1dev/gui-portfolio
+
+      - name: Deploy to server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            docker pull rom1dev/gui-portfolio
+            docker stop gui-portfolio || true
+            docker rm gui-portfolio || true
+            docker run -d -p 3008:3000 --name gui-portfolio rom1dev/gui-portfolio
